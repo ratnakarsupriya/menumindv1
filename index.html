@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MenuMind — Ask Anything About Restaurants</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0e0c;
+    --surface: #1a1814;
+    --surface2: #232018;
+    --border: #2e2b24;
+    --accent: #e8b86d;
+    --accent2: #c97d3a;
+    --text: #f0ece4;
+    --muted: #7a7568;
+    --user-bubble: #1e2a1a;
+    --ai-bubble: #1a1814;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 760px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0 16px;
+  }
+
+  header {
+    padding: 40px 0 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .logo h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+  }
+
+  .logo .tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 300;
+  }
+
+  .status-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.4s;
+  }
+  .status-dot.loading { background: var(--accent); animation: pulse 1s infinite; }
+  .status-dot.ready   { background: #5a9e5a; box-shadow: 0 0 6px #5a9e5a88; }
+  .status-dot.error   { background: var(--accent2); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.25; }
+  }
+
+  #statusMsg {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .suggestions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .suggestion-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .suggestion-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--surface2);
+  }
+
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 300px;
+  }
+
+  .message {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    animation: fadeUp 0.3s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .message-role {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    padding: 0 4px;
+  }
+
+  .message.user .message-role { color: #6a8f6a; }
+  .message.ai   .message-role { color: var(--accent); }
+
+  .message-bubble {
+    background: var(--ai-bubble);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 0.9rem;
+    line-height: 1.65;
+    color: var(--text);
+  }
+
+  .message.user .message-bubble {
+    background: var(--user-bubble);
+    border-color: #2e3d2e;
+  }
+
+  .message-bubble strong { color: var(--accent); font-weight: 500; }
+  .message-bubble em { font-family: 'Playfair Display', serif; font-style: italic; }
+  .message-bubble p + p { margin-top: 10px; }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--muted);
+    padding: 60px 0;
+  }
+
+  .empty-state .icon { font-size: 2.5rem; opacity: 0.4; }
+  .empty-state p { font-size: 0.85rem; font-family: 'Playfair Display', serif; font-style: italic; }
+
+  .input-area {
+    position: sticky;
+    bottom: 0;
+    background: linear-gradient(to top, var(--bg) 80%, transparent);
+    padding: 20px 0 28px;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 8px 8px 16px;
+    transition: border-color 0.2s;
+  }
+
+  .input-row:focus-within { border-color: var(--accent); }
+
+  #userInput {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    resize: none;
+    min-height: 24px;
+    max-height: 120px;
+    line-height: 1.5;
+    padding: 4px 0;
+  }
+
+  #userInput::placeholder { color: var(--muted); }
+
+  #sendBtn {
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.2s, transform 0.1s;
+    align-self: flex-end;
+  }
+
+  #sendBtn:hover    { background: var(--accent2); }
+  #sendBtn:active   { transform: scale(0.95); }
+  #sendBtn:disabled { background: var(--border); cursor: not-allowed; }
+  #sendBtn svg { width: 16px; height: 16px; fill: var(--bg); }
+
+  .input-meta {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 4px 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+
+  .typing-indicator {
+    display: flex;
+    gap: 4px;
+    padding: 4px 0;
+    align-items: center;
+  }
+
+  .typing-indicator span {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: bounce 1.2s infinite;
+  }
+
+  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30%           { transform: translateY(-6px); opacity: 1; }
+  }
+
+  .context-info {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    padding: 4px 4px 0;
+  }
+
+  .error-msg { color: var(--accent2); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <h1>MenuMind</h1>
+      <span class="tag">Zomato × Claude AI</span>
+    </div>
+    <p class="subtitle">Ask anything about 9,000+ restaurants — in plain English</p>
+  </header>
+
+  <div class="status-bar">
+    <div class="status-dot loading" id="statusDot"></div>
+    <span id="statusMsg">Loading restaurant data...</span>
+  </div>
+
+  <div class="suggestions">
+    <button class="suggestion-btn" onclick="ask('What are the top 5 highest rated restaurants?')">Top 5 rated</button>
+    <button class="suggestion-btn" onclick="ask('Show me cheap Italian places')">Cheap Italian</button>
+    <button class="suggestion-btn" onclick="ask('Which cuisines have the most restaurants?')">Popular cuisines</button>
+    <button class="suggestion-btn" onclick="ask('Best restaurants that offer online delivery?')">Best for delivery</button>
+    <button class="suggestion-btn" onclick="ask('Any good North Indian restaurants with table booking?')">North Indian + booking</button>
+    <button class="suggestion-btn" onclick="ask('What is the average cost for two people?')">Avg cost for two</button>
+  </div>
+
+  <div class="chat-area" id="chatArea">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">🍽️</div>
+      <p>Loading restaurant data, just a moment...</p>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-row">
+      <textarea id="userInput" placeholder="Ask about restaurants, cuisines, ratings, prices..." rows="1"></textarea>
+      <button id="sendBtn" onclick="sendMessage()" disabled>
+        <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
+      </button>
+    </div>
+    <div class="input-meta">
+      <span id="rowCount">Loading...</span>
+      <span>Enter to send · Shift+Enter for newline</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  let restaurantData = [];
+  let messages = [];
+  let isLoading = false;
+
+  // ── AUTO-LOAD: fetches zomato.csv served from your own repo ──────────────────
+  // Vercel serves static files from root, so /zomato.csv just works once
+  // you've committed zomato.csv to your GitHub repo.
+  const CSV_URL = '/zomato.csv';
+
+  async function loadData() {
+    try {
+      setStatus('loading', 'Loading restaurant data...');
+      const res = await fetch(CSV_URL);
+      if (!res.ok) throw new Error(`Could not fetch data (HTTP ${res.status})`);
+      const text = await res.text();
+      restaurantData = parseCSV(text);
+      if (restaurantData.length === 0) throw new Error('CSV parsed 0 rows — check file format');
+
+      setStatus('ready', `${restaurantData.length.toLocaleString()} restaurants loaded`);
+      document.getElementById('rowCount').textContent = `${restaurantData.length.toLocaleString()} restaurants`;
+      document.getElementById('sendBtn').disabled = false;
+      document.getElementById('emptyState').innerHTML = `
+        <div class="icon">🍽️</div>
+        <p>Ready — ask anything about restaurants</p>
+      `;
+    } catch (err) {
+      setStatus('error', `Failed to load data: ${err.message}`);
+      document.getElementById('rowCount').textContent = 'Data unavailable';
+      document.getElementById('emptyState').innerHTML = `
+        <div class="icon">⚠️</div>
+        <p>${err.message}</p>
+      `;
+    }
+  }
+
+  function setStatus(state, msg) {
+    document.getElementById('statusDot').className = `status-dot ${state}`;
+    document.getElementById('statusMsg').textContent = msg;
+  }
+
+  // ── CSV PARSING ───────────────────────────────────────────────────────────────
+  function parseCSV(text) {
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length < 2) return [];
+    const headers = parseCSVLine(lines[0]);
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const vals = parseCSVLine(lines[i]);
+      if (vals.length < 2) continue;
+      const row = {};
+      headers.forEach((h, idx) => { row[h.trim()] = (vals[idx] || '').trim(); });
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function parseCSVLine(line) {
+    const result = [];
+    let cur = '', inQuotes = false;
+    for (const ch of line) {
+      if (ch === '"') { inQuotes = !inQuotes; }
+      else if (ch === ',' && !inQuotes) { result.push(cur); cur = ''; }
+      else { cur += ch; }
+    }
+    result.push(cur);
+    return result;
+  }
+
+  // ── RELEVANCE SEARCH ──────────────────────────────────────────────────────────
+  function searchRestaurants(query) {
+    const keywords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const scored = restaurantData.map(r => {
+      const text = Object.values(r).join(' ').toLowerCase();
+      let score = 0;
+      keywords.forEach(kw => { if (text.includes(kw)) score++; });
+      const name = (r['Restaurant Name'] || r['name'] || '').toLowerCase();
+      keywords.forEach(kw => { if (name.includes(kw)) score += 2; });
+      return { row: r, score };
+    });
+    const relevant = scored
+      .filter(s => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 40);
+    // Fall back to a sample if nothing matched
+    return relevant.length > 0 ? relevant.map(s => s.row) : restaurantData.slice(0, 50);
+  }
+
+  // ── INPUT HANDLING ────────────────────────────────────────────────────────────
+  const inputEl = document.getElementById('userInput');
+
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+  });
+
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  function ask(q) {
+    if (restaurantData.length === 0) return;
+    inputEl.value = q;
+    sendMessage();
+  }
+
+  // ── SEND MESSAGE ──────────────────────────────────────────────────────────────
+  async function sendMessage() {
+    const query = inputEl.value.trim();
+    if (!query || isLoading || restaurantData.length === 0) return;
+
+    isLoading = true;
+    document.getElementById('sendBtn').disabled = true;
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    document.getElementById('emptyState')?.remove();
+
+    messages.push({ role: 'user', content: query });
+    appendMessage('user', query);
+
+    const relevant = searchRestaurants(query);
+    const context = relevant.map(r => JSON.stringify(r)).join('\n');
+
+    const systemPrompt = `You are MenuMind, a knowledgeable and friendly restaurant advisor with access to a real Zomato restaurant database.
+Answer the user's question using only the restaurant data provided below. Be conversational, specific, and genuinely helpful.
+Format responses cleanly — use line breaks between items. Bold restaurant names using **name**.
+If the data is insufficient to fully answer, say so honestly rather than guessing.
+
+RESTAURANT DATA (${relevant.length} relevant rows):
+${context}`;
+
+    const aiMsgEl = appendMessage('ai', null, `Searching ${relevant.length} relevant restaurants...`);
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: messages.map(m => ({ role: m.role, content: m.content })),
+          systemPrompt,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Server error');
+      }
+
+      const data = await response.json();
+      const reply = data.reply;
+
+      aiMsgEl.querySelector('.message-bubble').innerHTML = formatReply(reply);
+      aiMsgEl.querySelector('.context-info')?.remove();
+      messages.push({ role: 'assistant', content: reply });
+
+    } catch (err) {
+      aiMsgEl.querySelector('.message-bubble').innerHTML =
+        `<span class="error-msg">Error: ${err.message}</span>`;
+    }
+
+    isLoading = false;
+    document.getElementById('sendBtn').disabled = false;
+    inputEl.focus();
+  }
+
+  // ── RENDERING ─────────────────────────────────────────────────────────────────
+  function formatReply(text) {
+    return text
+      .split('\n\n')
+      .map(para => `<p>${para
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>')
+      }</p>`)
+      .join('');
+  }
+
+  function appendMessage(role, content, contextNote) {
+    const chatArea = document.getElementById('chatArea');
+    const msgEl = document.createElement('div');
+    msgEl.className = `message ${role}`;
+
+    const roleLabel = document.createElement('div');
+    roleLabel.className = 'message-role';
+    roleLabel.textContent = role === 'user' ? 'You' : 'MenuMind';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+    bubble.innerHTML = content === null
+      ? `<div class="typing-indicator"><span></span><span></span><span></span></div>`
+      : formatReply(content);
+
+    msgEl.appendChild(roleLabel);
+    msgEl.appendChild(bubble);
+
+    if (contextNote) {
+      const meta = document.createElement('div');
+      meta.className = 'context-info';
+      meta.textContent = contextNote;
+      msgEl.appendChild(meta);
+    }
+
+    chatArea.appendChild(msgEl);
+    chatArea.scrollTop = chatArea.scrollHeight;
+    return msgEl;
+  }
+
+  // Kick off immediately on page load
+  loadData();
+</script>
+</body>
+</html>

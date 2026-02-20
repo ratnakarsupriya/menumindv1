@@ -1,0 +1,6 @@
+{
+  "name": "menumind",
+  "version": "1.0.0",
+  "description": "Chat with Zomato restaurant data using Claude AI",
+  "private": true
+}
